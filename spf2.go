@@ -58,7 +58,7 @@ func NewRequest(s *Server) *Request {
 	return r
 }
 
-// SetIPv4Addr sets the sender IPv4
+// SetIPv4Addr sets the IPv4 address of the client (sending) MTA
 func (r *Request) SetIPv4Addr(addr string) error {
 	var stat C.SPF_errcode_t
 	cstring := C.CString(addr)
@@ -70,7 +70,7 @@ func (r *Request) SetIPv4Addr(addr string) error {
 	return nil
 }
 
-// SetIPAddr sets the sender IP
+// SetIPAddr sets the IP address of the client (sending) MTA
 func (r *Request) SetIPAddr(ip net.IP) error {
 	var stat C.SPF_errcode_t
 	cstring := C.CString(ip.String())
@@ -86,14 +86,32 @@ func (r *Request) SetIPAddr(ip net.IP) error {
 	return nil
 }
 
-// SetEnvFrom sets the sender host
-func (r *Request) SetEnvFrom(fromHost string) error {
+// SetEnvFrom sets the envelope from email address from the SMTP MAIL FROM: command
+func (r *Request) SetEnvFrom(from string) error {
 	var stat C.int
-	cstring := C.CString(fromHost)
+	cstring := C.CString(from)
 	defer C.free(unsafe.Pointer(cstring))
 	stat = C.SPF_request_set_env_from(r.r, cstring)
 	if stat != C.int(C.SPF_E_SUCCESS) {
 		return &spfError{C.SPF_errcode_t(stat)}
+	}
+	return nil
+}
+
+// SetHeloDom sets the HELO domain name of the client (sending) MTA from
+// the SMTP HELO or EHLO commands
+//
+// This domain name will be used if the envelope from address is
+// null (e.g. MAIL FROM:<>).  This happens when a bounce is being
+// sent and, in effect, it is the client MTA that is sending the
+//  message.
+func (r *Request) SetHeloDom(domain string) (err error) {
+	var stat C.SPF_errcode_t
+	cstring := C.CString(domain)
+	defer C.free(unsafe.Pointer(cstring))
+	stat = C.SPF_request_set_helo_dom(r.r, cstring)
+	if stat != C.SPF_E_SUCCESS {
+		return &spfError{stat}
 	}
 	return nil
 }
