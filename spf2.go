@@ -4,11 +4,16 @@ package libspf2
 #cgo LDFLAGS: -L/usr/local/lib -L/usr/lib -lspf2
 #cgo CFLAGS: -g -O2 -Wno-error -I/usr/include -I/usr/local/include
 
-#include <stdio.h>
+#include <stdlib.h>
 #include <netdb.h>
 #include <spf2/spf.h>
 */
 import "C"
+
+import (
+	"net"
+	"unsafe"
+)
 
 const (
 	SPFResultINVALID   = Result(C.SPF_RESULT_INVALID)   // (invalid)
@@ -56,7 +61,25 @@ func NewRequest(s *Server) *Request {
 // SetIPv4Addr sets the sender IPv4
 func (r *Request) SetIPv4Addr(addr string) error {
 	var stat C.SPF_errcode_t
-	stat = C.SPF_request_set_ipv4_str(r.r, C.CString(addr))
+	cstring := C.CString(addr)
+	defer C.free(unsafe.Pointer(cstring))
+	stat = C.SPF_request_set_ipv4_str(r.r, cstring)
+	if stat != C.SPF_E_SUCCESS {
+		return &spfError{stat}
+	}
+	return nil
+}
+
+// SetIPAddr sets the sender IP
+func (r *Request) SetIPAddr(ip net.IP) error {
+	var stat C.SPF_errcode_t
+	cstring := C.CString(ip.String())
+	defer C.free(unsafe.Pointer(cstring))
+	if ip.To4() != nil {
+		stat = C.SPF_request_set_ipv4_str(r.r, cstring)
+	} else {
+		stat = C.SPF_request_set_ipv6_str(r.r, cstring)
+	}
 	if stat != C.SPF_E_SUCCESS {
 		return &spfError{stat}
 	}
@@ -66,7 +89,9 @@ func (r *Request) SetIPv4Addr(addr string) error {
 // SetEnvFrom sets the sender host
 func (r *Request) SetEnvFrom(fromHost string) error {
 	var stat C.int
-	stat = C.SPF_request_set_env_from(r.r, C.CString(fromHost))
+	cstring := C.CString(fromHost)
+	defer C.free(unsafe.Pointer(cstring))
+	stat = C.SPF_request_set_env_from(r.r, cstring)
 	if stat != C.int(C.SPF_E_SUCCESS) {
 		return &spfError{C.SPF_errcode_t(stat)}
 	}
